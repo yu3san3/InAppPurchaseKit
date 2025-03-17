@@ -1,13 +1,13 @@
 import SwiftUI
 import StoreKit
 
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, visionOS 1.0, *)
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 private struct InAppPurchaseContainerModifier: ViewModifier {
-    #if !os(watchOS) || !os(tvOS)
+#if !os(watchOS) || !os(tvOS)
     @Environment(\.requestReview) var requestReview
-    #endif
+#endif
 
-    @ObservedObject private var inAppPurchaseState = InAppPurchaseState.shared
+    @StateObject private var inAppPurchaseState = InAppPurchaseState.shared
 
     func body(content: Content) -> some View {
         content
@@ -18,15 +18,15 @@ private struct InAppPurchaseContainerModifier: ViewModifier {
             .onInAppPurchaseCompletion { _, result in
                 inAppPurchaseState.updateIsLoading(false)
 
-                await processPurchaseResult(result)
+                await processPurchaseResultWithRequestingReview(result)
             }
     }
 
-    private func processPurchaseResult(
+    private func processPurchaseResultWithRequestingReview(
         _ result: Result<Product.PurchaseResult, Error>
     ) async {
         do {
-            try await inAppPurchaseState.processPurchaseResult(result)
+            try await inAppPurchaseState.handlePurchaseResult(result)
 
             #if !os(watchOS) || !os(tvOS)
             requestReview()
@@ -37,20 +37,30 @@ private struct InAppPurchaseContainerModifier: ViewModifier {
     }
 }
 
+@available(iOS, deprecated: 17.0, message: "Use InAppPurchaseContainerModifier instead.")
+@available(macOS, deprecated: 14.0, message: "Use InAppPurchaseContainerModifier instead.")
+@available(tvOS, deprecated: 17.0, message: "Use InAppPurchaseContainerModifier instead.")
+@available(watchOS, deprecated: 10.0, message: "Use InAppPurchaseContainerModifier instead.")
+private struct InAppPurchaseContainerLegacyModifier: ViewModifier {
+    @StateObject private var inAppPurchaseState = InAppPurchaseState.shared
+
+    func body(content: Content) -> some View {
+        content
+            .environmentObject(inAppPurchaseState)
+    }
+}
+
 extension View {
     /// `InAppPurchaseState` を環境オブジェクトとして注入する。
     ///
-    /// 以下のOS以前では適用されない。
-    /// - iOS 17.0
-    /// - macOS 14.0
-    /// - tvOS 17.0
-    /// - watchOS 10.0
-    /// - visionOS 1.0
+    /// iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0 以降では、アプリ内購入の開始および完了時の処理を自動で行う。
+    /// それ以前のOSでは、`InAppPurchaseState` を環境オブジェクトとして設定するのみを行うため、
+    /// アプリ内購入の開始および完了時の処理は手動で定義する必要がある。
     public func inAppPurchaseContainer() -> some View {
-        if #available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, visionOS 1.0, *) {
+        if #available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *) {
             return modifier(InAppPurchaseContainerModifier())
         } else {
-            return self
+            return modifier(InAppPurchaseContainerLegacyModifier())
         }
     }
 }
