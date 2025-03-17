@@ -26,7 +26,7 @@ private struct InAppPurchaseContainerModifier: ViewModifier {
         _ result: Result<Product.PurchaseResult, Error>
     ) async {
         do {
-            try await inAppPurchaseState.processPurchaseResult(result)
+            try await inAppPurchaseState.handlePurchaseResult(result)
 
             #if !os(watchOS) || !os(tvOS)
             requestReview()

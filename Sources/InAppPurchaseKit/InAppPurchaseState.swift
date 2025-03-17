@@ -37,27 +37,22 @@ public class InAppPurchaseState: ObservableObject {
         updateIsLoading(false)
     }
 
-    /// 購入処理の結果を処理
+    /// 購入の結果を処理
     ///
-    /// - 購入に成功した場合: トランザクションを完了したのちに購入情報を同期する。
-    /// - 失敗またはキャンセルされた場合: エラーを投げる。
+    /// - 購入に成功した場合は、トランザクションを完了したのちに購入情報を同期する。
+    /// - 失敗またはキャンセルされた場合にはエラーを投げる。
     ///
     /// - Parameter result: `Product.PurchaseResult` の `Result` 型。
-    public func processPurchaseResult(
+    public func handlePurchaseResult(
         _ result: Result<Product.PurchaseResult, Error>
     ) async throws {
-        guard case let .success(.success(.verified(transaction))) = result else {
-            throw NSError(
-                domain: "InAppPurchaseError",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "購入に失敗したか、キャンセルされました。"]
-            )
+        switch result {
+        case let .success(purchaseResult):
+            try await handlePurchaseResultSuccess(purchaseResult)
+
+        case let .failure(error):
+            throw error
         }
-
-        // これをしないと消耗型の商品を複数回購入できない。
-        await transaction.finish()
-
-        await syncPurchases()
     }
 
     /// 購入情報を復元する。
@@ -97,5 +92,28 @@ public class InAppPurchaseState: ObservableObject {
         }
 
         return result
+    }
+
+    /// 購入の結果を処理
+    ///
+    /// - 購入に成功した場合は、トランザクションを完了したのちに購入情報を同期する。
+    /// - 失敗またはキャンセルされた場合にはエラーを投げる。
+    ///
+    /// - Parameter result: `Product.PurchaseResult` 型。
+    private func handlePurchaseResultSuccess(
+        _ purchaseResult: Product.PurchaseResult
+    ) async throws {
+        guard case let .success(.verified(transaction)) = purchaseResult else {
+            throw NSError(
+                domain: "InAppPurchaseError",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "購入に失敗したか、キャンセルされました。"]
+            )
+        }
+
+        // これをしないと消耗型の商品を複数回購入できない。
+        await transaction.finish()
+
+        await syncPurchases()
     }
 }
